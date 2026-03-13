@@ -103,19 +103,25 @@ actor {
   let accessControlState = AccessControl.initState();
   include MixinAuthorization(accessControlState);
 
+  // Auto-register the caller as a user (safe to call multiple times)
+  public shared ({ caller }) func registerUser() : async () {
+    AccessControl.registerUser(accessControlState, caller);
+  };
+
   // Required profile functions for frontend
   public query ({ caller }) func getCallerUserProfile() : async ?UserProfile {
     userProfiles.get(caller);
   };
 
   public shared ({ caller }) func saveCallerUserProfile(profile : UserProfile) : async () {
-    if (not (AccessControl.hasPermission(accessControlState, caller, #user))) {
-      Runtime.trap("Unauthorized: Only users can save profiles");
-    };
+    // Auto-register then save
+    AccessControl.registerUser(accessControlState, caller);
     userProfiles.add(caller, profile);
   };
 
   public shared ({ caller }) func uploadVideo(title : Text, description : Text, hashtags : [Text], blobId : Storage.ExternalBlob, thumbnailBlobId : Storage.ExternalBlob) : async Nat {
+    // Auto-register then check permission
+    AccessControl.registerUser(accessControlState, caller);
     if (not (AccessControl.hasPermission(accessControlState, caller, #user))) {
       Runtime.trap("Unauthorized: Only users can upload videos");
     };
@@ -175,10 +181,7 @@ actor {
   };
 
   public shared ({ caller }) func likeVideo(videoId : Nat) : async () {
-    if (not (AccessControl.hasPermission(accessControlState, caller, #user))) {
-      Runtime.trap("Unauthorized: Only users can like videos");
-    };
-
+    AccessControl.registerUser(accessControlState, caller);
     switch (videos.get(videoId)) {
       case (null) { Runtime.trap("Video not found") };
       case (?_) {
@@ -199,10 +202,7 @@ actor {
   };
 
   public shared ({ caller }) func unlikeVideo(videoId : Nat) : async () {
-    if (not (AccessControl.hasPermission(accessControlState, caller, #user))) {
-      Runtime.trap("Unauthorized: Only users can unlike videos");
-    };
-
+    AccessControl.registerUser(accessControlState, caller);
     switch (videos.get(videoId)) {
       case (null) { Runtime.trap("Video not found") };
       case (?_) {
@@ -236,10 +236,7 @@ actor {
   };
 
   public shared ({ caller }) func deleteVideo(videoId : Nat) : async () {
-    if (not (AccessControl.hasPermission(accessControlState, caller, #user))) {
-      Runtime.trap("Unauthorized: Only users can delete videos");
-    };
-
+    AccessControl.registerUser(accessControlState, caller);
     switch (videos.get(videoId)) {
       case (null) { Runtime.trap("Video not found") };
       case (?video) {
@@ -253,10 +250,7 @@ actor {
   };
 
   public shared ({ caller }) func addComment(videoId : Nat, content : Text) : async Nat {
-    if (not (AccessControl.hasPermission(accessControlState, caller, #user))) {
-      Runtime.trap("Unauthorized: Only users can comment");
-    };
-
+    AccessControl.registerUser(accessControlState, caller);
     switch (videos.get(videoId)) {
       case (null) { Runtime.trap("Video not found") };
       case (?_) {
@@ -286,10 +280,7 @@ actor {
   };
 
   public shared ({ caller }) func deleteComment(commentId : Nat) : async () {
-    if (not (AccessControl.hasPermission(accessControlState, caller, #user))) {
-      Runtime.trap("Unauthorized: Only users can delete comments");
-    };
-
+    AccessControl.registerUser(accessControlState, caller);
     switch (comments.get(commentId)) {
       case (null) { Runtime.trap("Comment not found") };
       case (?comment) {
@@ -302,10 +293,7 @@ actor {
   };
 
   public shared ({ caller }) func createOrUpdateProfile(username : Text, displayName : Text, bio : Text, avatarBlobId : Storage.ExternalBlob) : async () {
-    if (not (AccessControl.hasPermission(accessControlState, caller, #user))) {
-      Runtime.trap("Unauthorized: Only users can update profiles");
-    };
-
+    AccessControl.registerUser(accessControlState, caller);
     let profile : UserProfile = {
       principal = caller;
       username;
@@ -321,10 +309,7 @@ actor {
   };
 
   public shared ({ caller }) func followUser(userToFollow : Principal) : async () {
-    if (not (AccessControl.hasPermission(accessControlState, caller, #user))) {
-      Runtime.trap("Unauthorized: Only users can follow others");
-    };
-
+    AccessControl.registerUser(accessControlState, caller);
     let followersSet = switch (followers.get(userToFollow)) {
       case (null) {
         let newSet = Set.singleton(caller);
@@ -351,10 +336,7 @@ actor {
   };
 
   public shared ({ caller }) func unfollowUser(userToUnfollow : Principal) : async () {
-    if (not (AccessControl.hasPermission(accessControlState, caller, #user))) {
-      Runtime.trap("Unauthorized: Only users can unfollow others");
-    };
-
+    AccessControl.registerUser(accessControlState, caller);
     let followersSet = switch (followers.get(userToUnfollow)) {
       case (null) {
         let newSet = Set.empty<Principal>();

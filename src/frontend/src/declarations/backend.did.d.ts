@@ -90,6 +90,7 @@ export interface _SERVICE {
   'getVideosPaginated' : ActorMethod<[bigint, bigint], Array<Video>>,
   'incrementViews' : ActorMethod<[bigint], undefined>,
   'isCallerAdmin' : ActorMethod<[], boolean>,
+  'registerUser' : ActorMethod<[], undefined>,
   'isFollowing' : ActorMethod<[Principal, Principal], boolean>,
   'likeVideo' : ActorMethod<[bigint], undefined>,
   'saveCallerUserProfile' : ActorMethod<[UserProfile], undefined>,

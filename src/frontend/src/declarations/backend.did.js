@@ -115,6 +115,7 @@ export const idlService = IDL.Service({
     ),
   'incrementViews' : IDL.Func([IDL.Nat], [], []),
   'isCallerAdmin' : IDL.Func([], [IDL.Bool], ['query']),
+  'registerUser' : IDL.Func([], [], []),
   'isFollowing' : IDL.Func(
       [IDL.Principal, IDL.Principal],
       [IDL.Bool],
@@ -241,6 +242,7 @@ export const idlFactory = ({ IDL }) => {
       ),
     'incrementViews' : IDL.Func([IDL.Nat], [], []),
     'isCallerAdmin' : IDL.Func([], [IDL.Bool], ['query']),
+  'registerUser' : IDL.Func([], [], []),
     'isFollowing' : IDL.Func(
         [IDL.Principal, IDL.Principal],
         [IDL.Bool],

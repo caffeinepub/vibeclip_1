@@ -158,6 +158,7 @@ export interface backendInterface {
     getVideosPaginated(start: bigint, pageSize: bigint): Promise<Array<Video>>;
     incrementViews(videoId: bigint): Promise<void>;
     isCallerAdmin(): Promise<boolean>;
+    registerUser(): Promise<void>;
     isFollowing(user: Principal, target: Principal): Promise<boolean>;
     likeVideo(videoId: bigint): Promise<void>;
     saveCallerUserProfile(profile: UserProfile): Promise<void>;
@@ -516,6 +517,18 @@ export class Backend implements backendInterface {
         } else {
             const result = await this.actor.isCallerAdmin();
             return result;
+        }
+    }
+    async registerUser(): Promise<void> {
+        if (this.processError) {
+            try {
+                await this.actor.registerUser();
+            } catch (e) {
+                this.processError(e);
+                throw new Error("unreachable");
+            }
+        } else {
+            await this.actor.registerUser();
         }
     }
     async isFollowing(arg0: Principal, arg1: Principal): Promise<boolean> {

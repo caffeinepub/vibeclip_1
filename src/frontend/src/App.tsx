@@ -8,7 +8,8 @@ import { FeedPage } from "@/pages/FeedPage";
 import { LoginPage } from "@/pages/LoginPage";
 import { ProfilePage } from "@/pages/ProfilePage";
 import { UploadPage } from "@/pages/UploadPage";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef } from "react";
+import { useState } from "react";
 
 export default function App() {
   const [path, setPath] = useState(() => {
@@ -16,34 +17,34 @@ export default function App() {
     return p || "/";
   });
 
-  const { loginStatus } = useAuth();
+  const { isAuthenticated } = useAuth();
   const { actor } = useActor();
   const [showWelcome, setShowWelcome] = useState(false);
-  const prevLoginStatus = useRef(loginStatus);
-  const registeredRef = useRef(false);
+  const prevAuthenticated = useRef(isAuthenticated);
+  const registered = useRef(false);
 
+  // Auto-register user after login and show welcome modal
   useEffect(() => {
-    if (loginStatus === "success" && prevLoginStatus.current !== "success") {
+    if (isAuthenticated && !prevAuthenticated.current) {
+      // Show welcome modal once per session
       if (!sessionStorage.getItem("vc_welcomed")) {
         sessionStorage.setItem("vc_welcomed", "1");
         setShowWelcome(true);
       }
     }
-    prevLoginStatus.current = loginStatus;
-  }, [loginStatus]);
+    prevAuthenticated.current = isAuthenticated;
+  }, [isAuthenticated]);
 
-  // Auto-register user as #user role when authenticated
+  // Auto-register user with the backend as soon as actor + auth are ready
   useEffect(() => {
-    if (loginStatus === "success" && actor && !registeredRef.current) {
-      registeredRef.current = true;
-      (actor as any)._initializeAccessControlWithSecret("").catch(() => {
-        // Ignore errors - user may already be registered
+    if (isAuthenticated && actor && !registered.current) {
+      registered.current = true;
+      actor.registerUser().catch(() => {
+        // Reset so we retry next render if it failed
+        registered.current = false;
       });
     }
-    if (loginStatus !== "success") {
-      registeredRef.current = false;
-    }
-  }, [loginStatus, actor]);
+  }, [isAuthenticated, actor]);
 
   useEffect(() => {
     const handler = () => {

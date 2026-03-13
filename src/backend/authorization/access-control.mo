@@ -21,19 +21,29 @@ module {
     };
   };
 
-  // First principal that calls this function becomes admin, all other principals become users.
+  // Claim admin with a secret token, or register as a regular user.
+  // If the correct token is provided, the caller is always promoted to admin
+  // regardless of whether they were previously registered as a user.
   public func initialize(state : AccessControlState, caller : Principal, adminToken : Text, userProvidedToken : Text) {
     if (caller.isAnonymous()) { return };
-    switch (state.userRoles.get(caller)) {
-      case (?_) {};
-      case (null) {
-        if (not state.adminAssigned and userProvidedToken == adminToken) {
-          state.userRoles.add(caller, #admin);
-          state.adminAssigned := true;
-        } else {
-          state.userRoles.add(caller, #user);
-        };
+    if (userProvidedToken == adminToken) {
+      // Correct token: promote to admin unconditionally
+      state.userRoles.add(caller, #admin);
+      state.adminAssigned := true;
+    } else {
+      // Wrong token: only register as user if not already registered
+      switch (state.userRoles.get(caller)) {
+        case (?_) {};
+        case (null) { state.userRoles.add(caller, #user) };
       };
+    };
+  };
+
+  public func registerUser(state : AccessControlState, caller : Principal) {
+    if (caller.isAnonymous()) { return };
+    switch (state.userRoles.get(caller)) {
+      case (?_) {}; // Already registered, don't downgrade
+      case (null) { state.userRoles.add(caller, #user) };
     };
   };
 
@@ -41,9 +51,7 @@ module {
     if (caller.isAnonymous()) { return #guest };
     switch (state.userRoles.get(caller)) {
       case (?role) { role };
-      case (null) {
-        Runtime.trap("User is not registered");
-      };
+      case (null) { #guest };
     };
   };
 

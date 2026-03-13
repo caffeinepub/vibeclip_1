@@ -65,6 +65,7 @@ export interface backendInterface {
     getVideosPaginated(start: bigint, pageSize: bigint): Promise<Array<Video>>;
     incrementViews(videoId: bigint): Promise<void>;
     isCallerAdmin(): Promise<boolean>;
+    registerUser(): Promise<void>;
     isFollowing(user: Principal, target: Principal): Promise<boolean>;
     likeVideo(videoId: bigint): Promise<void>;
     saveCallerUserProfile(profile: UserProfile): Promise<void>;
