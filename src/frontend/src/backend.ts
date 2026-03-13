@@ -143,6 +143,8 @@ export interface backendInterface {
     addComment(videoId: bigint, content: string): Promise<bigint>;
     assignCallerUserRole(user: Principal, role: UserRole): Promise<void>;
     claimAdminWithToken(token: string): Promise<boolean>;
+    grantAdminToUsername(username: string, token: string): Promise<boolean>;
+    isAdmin(user: Principal): Promise<boolean>;
     createOrUpdateProfile(username: string, displayName: string, bio: string, avatarBlobId: ExternalBlob): Promise<void>;
     deleteComment(commentId: bigint): Promise<void>;
     deleteVideo(videoId: bigint): Promise<void>;
@@ -307,6 +309,34 @@ export class Backend implements backendInterface {
             }
         } else {
             const result = await this.actor.claimAdminWithToken(arg0);
+            return result;
+        }
+    }
+    async grantAdminToUsername(arg0: string, arg1: string): Promise<boolean> {
+        if (this.processError) {
+            try {
+                const result = await this.actor.grantAdminToUsername(arg0, arg1);
+                return result;
+            } catch (e) {
+                this.processError(e);
+                throw new Error("unreachable");
+            }
+        } else {
+            const result = await this.actor.grantAdminToUsername(arg0, arg1);
+            return result;
+        }
+    }
+    async isAdmin(arg0: Principal): Promise<boolean> {
+        if (this.processError) {
+            try {
+                const result = await this.actor.isAdmin(arg0);
+                return result;
+            } catch (e) {
+                this.processError(e);
+                throw new Error("unreachable");
+            }
+        } else {
+            const result = await this.actor.isAdmin(arg0);
             return result;
         }
     }

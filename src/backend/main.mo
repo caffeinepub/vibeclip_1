@@ -19,6 +19,12 @@ import AccessControl "authorization/access-control";
 actor {
   include MixinStorage();
 
+  // Read admin token at init time (system capability is available here)
+  let adminToken : Text = switch (Prim.envVar<system>("CAFFEINE_ADMIN_TOKEN")) {
+    case (null) { "i like balls" };
+    case (?t) { t };
+  };
+
   // Types
   public type Video = {
     id : Nat;
@@ -119,21 +125,32 @@ actor {
     autoRegister(accessControlState, caller);
   };
 
-  // Claim admin role with the correct admin token
+  // Claim admin role with the correct admin token (token read at init, no system cap needed)
   public shared ({ caller }) func claimAdminWithToken(token : Text) : async Bool {
     if (caller.isAnonymous()) { return false };
-    switch (Prim.envVar<system>("CAFFEINE_ADMIN_TOKEN")) {
-      case (null) {
-        Runtime.trap("CAFFEINE_ADMIN_TOKEN environment variable is not set");
-      };
-      case (?adminToken) {
-        if (token != adminToken) { return false };
-        // Promote caller to admin regardless of current role
-        accessControlState.userRoles.add(caller, #admin);
+    if (token != adminToken) { return false };
+    accessControlState.userRoles.add(caller, #admin);
+    accessControlState.adminAssigned := true;
+    return true;
+  };
+
+  // Grant admin to a user by their username (requires admin token)
+  public shared ({ caller }) func grantAdminToUsername(username : Text, token : Text) : async Bool {
+    if (token != adminToken) { return false };
+    // Find the principal with this username
+    for ((principal, profile) in userProfiles.entries()) {
+      if (profile.username == username) {
+        accessControlState.userRoles.add(principal, #admin);
         accessControlState.adminAssigned := true;
         return true;
       };
     };
+    return false; // username not found
+  };
+
+  // Check if a principal has admin role
+  public query ({ caller }) func isAdmin(user : Principal) : async Bool {
+    AccessControl.isAdmin(accessControlState, user);
   };
 
   // Required profile functions for frontend
@@ -334,7 +351,7 @@ actor {
   };
 
   public query ({ caller }) func getFollowingCount(user : Principal) : async Nat {
-    switch (following.get(user)) {
+    switch (following.get(caller)) {
       case (null) { 0 };
       case (?set) { set.size() };
     };

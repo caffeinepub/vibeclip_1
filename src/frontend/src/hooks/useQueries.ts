@@ -292,3 +292,24 @@ export function useClaimAdmin() {
     },
   });
 }
+
+export function useGrantAdminToUsername() {
+  const { actor } = useActor();
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async ({
+      username,
+      token,
+    }: { username: string; token: string }) => {
+      if (!actor) throw new Error("Not authenticated");
+      const granted = await actor.grantAdminToUsername(username, token);
+      if (!granted) {
+        throw new Error("Username not found or invalid token");
+      }
+      return granted;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["admin"] });
+    },
+  });
+}

@@ -1,24 +1,22 @@
 # Vibeclip
 
 ## Current State
-- Profile update fails because users are never registered in the access control system
-- Admin claim broken for same reason
-- deleteVideo only allows uploader to delete, not admin
-- Backend data stored in non-stable Maps, lost on canister upgrade
+Admin claim via `claimAdminWithToken` calls `Prim.envVar<system>("CAFFEINE_ADMIN_TOKEN")` inside a shared function -- `system` capability is unavailable there, so the call either traps or returns null, making admin grant silently fail every time.
 
 ## Requested Changes (Diff)
 
 ### Add
-- Auto-register user after login
-- Stable storage for all backend data
+- `grantAdminToUsername(username: Text, token: Text)` backend function: looks up a user profile by username and promotes them to admin if the token is correct.
+- Admin token read at actor initialization (stored as `let adminToken`) so it is available in all shared functions.
 
 ### Modify
-- deleteVideo: allow admin to delete any video
-- App.tsx: call registration after login
+- Read `CAFFEINE_ADMIN_TOKEN` at actor init time (top-level `let`) instead of inside the shared function.
+- `claimAdminWithToken` uses the stored `adminToken` value.
+- Profile page: add a "Grant Admin by Username" field next to the existing admin claim, allowing the current user to type a username and promote them.
 
 ### Remove
-- Nothing
+- `Prim.envVar<system>` call inside `claimAdminWithToken` shared function.
 
 ## Implementation Plan
-1. Update main.mo: stable vars, preupgrade/postupgrade, fix deleteVideo
-2. Update App.tsx: auto-register on login
+1. Fix `main.mo`: read env var at init, fix `claimAdminWithToken`, add `grantAdminToUsername`.
+2. Update Profile page frontend to include a form that lets an admin (or token holder) grant admin to another user by username.

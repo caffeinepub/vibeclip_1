@@ -19,6 +19,7 @@ import {
   useDeleteVideo,
   useFollowerCount,
   useFollowingCount,
+  useGrantAdminToUsername,
   useIsCallerAdmin,
   useVideosFeed,
 } from "@/hooks/useQueries";
@@ -48,6 +49,7 @@ export function ProfilePage({ onNavigate }: ProfilePageProps) {
   const createOrUpdateProfile = useCreateOrUpdateProfile();
   const deleteVideo = useDeleteVideo();
   const claimAdmin = useClaimAdmin();
+  const grantAdminToUsername = useGrantAdminToUsername();
 
   const [editOpen, setEditOpen] = useState(false);
   const [editUsername, setEditUsername] = useState("");
@@ -56,6 +58,11 @@ export function ProfilePage({ onNavigate }: ProfilePageProps) {
 
   const [adminExpanded, setAdminExpanded] = useState(false);
   const [adminToken, setAdminToken] = useState("");
+
+  // Grant admin to another user by username
+  const [grantExpanded, setGrantExpanded] = useState(false);
+  const [grantUsername, setGrantUsername] = useState("");
+  const [grantToken, setGrantToken] = useState("");
 
   const userVideos =
     videos?.filter(
@@ -94,6 +101,22 @@ export function ProfilePage({ onNavigate }: ProfilePageProps) {
       await refetchAdmin();
     } catch {
       toast.error("Invalid admin token. Please try again.");
+    }
+  };
+
+  const handleGrantAdminToUsername = async () => {
+    try {
+      await grantAdminToUsername.mutateAsync({
+        username: grantUsername.trim(),
+        token: grantToken,
+      });
+      toast.success(`Admin granted to @${grantUsername.trim()}!`);
+      setGrantUsername("");
+      setGrantToken("");
+      setGrantExpanded(false);
+    } catch (e: unknown) {
+      const msg = e instanceof Error ? e.message : "Failed";
+      toast.error(msg);
     }
   };
 
@@ -305,6 +328,62 @@ export function ProfilePage({ onNavigate }: ProfilePageProps) {
                 )}
               </div>
             )}
+
+            {/* Grant admin to another user by username (visible to anyone with the token) */}
+            <div className="mt-3">
+              <button
+                type="button"
+                data-ocid="profile.panel"
+                onClick={() => setGrantExpanded((v) => !v)}
+                className="flex items-center gap-1 text-muted-foreground/40 text-xs hover:text-muted-foreground/60 transition-colors"
+              >
+                Grant admin to user
+                {grantExpanded ? (
+                  <ChevronUp size={12} />
+                ) : (
+                  <ChevronDown size={12} />
+                )}
+              </button>
+              {grantExpanded && (
+                <div className="mt-2 p-3 bg-secondary/40 rounded-lg space-y-2 border border-border/30">
+                  <p className="text-xs text-muted-foreground">
+                    Enter a username and the admin token to grant them admin
+                    access.
+                  </p>
+                  <Input
+                    data-ocid="profile.search_input"
+                    value={grantUsername}
+                    onChange={(e) => setGrantUsername(e.target.value)}
+                    placeholder="Username (e.g. anonymousfrog)"
+                    className="bg-secondary border-0 text-sm h-9"
+                  />
+                  <Input
+                    type="password"
+                    data-ocid="profile.textarea"
+                    value={grantToken}
+                    onChange={(e) => setGrantToken(e.target.value)}
+                    placeholder="Admin token"
+                    className="bg-secondary border-0 text-sm h-9"
+                  />
+                  <Button
+                    type="button"
+                    data-ocid="profile.confirm_button"
+                    onClick={handleGrantAdminToUsername}
+                    disabled={
+                      grantAdminToUsername.isPending ||
+                      !grantUsername.trim() ||
+                      !grantToken.trim()
+                    }
+                    size="sm"
+                    className="w-full bg-primary text-primary-foreground font-semibold"
+                  >
+                    {grantAdminToUsername.isPending
+                      ? "Granting..."
+                      : "Grant Admin"}
+                  </Button>
+                </div>
+              )}
+            </div>
           </>
         )}
       </div>
