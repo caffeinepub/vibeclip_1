@@ -1,6 +1,7 @@
 import { BottomNav } from "@/components/BottomNav";
 import { WelcomeModal } from "@/components/WelcomeModal";
 import { Toaster } from "@/components/ui/sonner";
+import { useActor } from "@/hooks/useActor";
 import { useAuth } from "@/hooks/useAuth";
 import { DiscoverPage } from "@/pages/DiscoverPage";
 import { FeedPage } from "@/pages/FeedPage";
@@ -16,8 +17,10 @@ export default function App() {
   });
 
   const { loginStatus } = useAuth();
+  const { actor } = useActor();
   const [showWelcome, setShowWelcome] = useState(false);
   const prevLoginStatus = useRef(loginStatus);
+  const registeredRef = useRef(false);
 
   useEffect(() => {
     if (loginStatus === "success" && prevLoginStatus.current !== "success") {
@@ -28,6 +31,19 @@ export default function App() {
     }
     prevLoginStatus.current = loginStatus;
   }, [loginStatus]);
+
+  // Auto-register user as #user role when authenticated
+  useEffect(() => {
+    if (loginStatus === "success" && actor && !registeredRef.current) {
+      registeredRef.current = true;
+      (actor as any)._initializeAccessControlWithSecret("").catch(() => {
+        // Ignore errors - user may already be registered
+      });
+    }
+    if (loginStatus !== "success") {
+      registeredRef.current = false;
+    }
+  }, [loginStatus, actor]);
 
   useEffect(() => {
     const handler = () => {

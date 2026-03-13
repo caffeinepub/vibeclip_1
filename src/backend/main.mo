@@ -49,8 +49,8 @@ actor {
   };
 
   // ID counters
-  var nextVideoId = 1;
-  var nextCommentId = 1;
+  stable var nextVideoId = 1;
+  stable var nextCommentId = 1;
 
   // Storage
   let videos = Map.empty<Nat, Video>();
@@ -60,6 +60,32 @@ actor {
   let following = Map.empty<Principal, Set.Set<Principal>>();
   let videoLikes = Map.empty<Nat, Set.Set<Principal>>();
   let hashtagVideos = Map.empty<Text, Set.Set<Nat>>();
+
+  // Stable storage for persistence across upgrades
+  stable var stableVideos : [(Nat, Video)] = [];
+  stable var stableProfiles : [(Principal, UserProfile)] = [];
+  stable var stableComments : [(Nat, Comment)] = [];
+
+  system func preupgrade() {
+    stableVideos := videos.entries().toArray();
+    stableProfiles := userProfiles.entries().toArray();
+    stableComments := comments.entries().toArray();
+  };
+
+  system func postupgrade() {
+    for ((k, v) in stableVideos.values()) {
+      videos.add(k, v);
+    };
+    for ((k, v) in stableProfiles.values()) {
+      userProfiles.add(k, v);
+    };
+    for ((k, v) in stableComments.values()) {
+      comments.add(k, v);
+    };
+    stableVideos := [];
+    stableProfiles := [];
+    stableComments := [];
+  };
 
   // Modules
   module Video {
@@ -79,9 +105,6 @@ actor {
 
   // Required profile functions for frontend
   public query ({ caller }) func getCallerUserProfile() : async ?UserProfile {
-    if (not (AccessControl.hasPermission(accessControlState, caller, #user))) {
-      Runtime.trap("Unauthorized: Only users can access profiles");
-    };
     userProfiles.get(caller);
   };
 
@@ -220,8 +243,9 @@ actor {
     switch (videos.get(videoId)) {
       case (null) { Runtime.trap("Video not found") };
       case (?video) {
-        if (video.uploader != caller) {
-          Runtime.trap("Unauthorized: Only uploader can delete video");
+        // Allow admin OR uploader to delete
+        if (video.uploader != caller and not AccessControl.isAdmin(accessControlState, caller)) {
+          Runtime.trap("Unauthorized: Only uploader or admin can delete video");
         };
         videos.remove(videoId);
       };
@@ -269,8 +293,8 @@ actor {
     switch (comments.get(commentId)) {
       case (null) { Runtime.trap("Comment not found") };
       case (?comment) {
-        if (comment.author != caller) {
-          Runtime.trap("Unauthorized: Only author can delete comment");
+        if (comment.author != caller and not AccessControl.isAdmin(accessControlState, caller)) {
+          Runtime.trap("Unauthorized: Only author or admin can delete comment");
         };
         comments.remove(commentId);
       };
