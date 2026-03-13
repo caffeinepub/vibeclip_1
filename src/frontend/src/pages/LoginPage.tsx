@@ -1,6 +1,7 @@
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/hooks/useAuth";
 import { Loader2 } from "lucide-react";
+import { useEffect } from "react";
 
 interface LoginPageProps {
   onNavigate: (path: string) => void;
@@ -9,10 +10,11 @@ interface LoginPageProps {
 export function LoginPage({ onNavigate }: LoginPageProps) {
   const { login, loginStatus, isAuthenticated } = useAuth();
 
-  if (isAuthenticated) {
-    onNavigate("/");
-    return null;
-  }
+  useEffect(() => {
+    if (isAuthenticated) {
+      onNavigate("/");
+    }
+  }, [isAuthenticated, onNavigate]);
 
   const isLoggingIn = loginStatus === "logging-in";
 
@@ -55,6 +57,7 @@ export function LoginPage({ onNavigate }: LoginPageProps) {
         type="button"
         onClick={login}
         disabled={isLoggingIn}
+        data-ocid="login.primary_button"
         className="w-full max-w-xs h-13 text-base font-bold rounded-xl bg-primary text-primary-foreground neon-glow hover:opacity-90 transition-opacity"
       >
         {isLoggingIn ? (
@@ -75,6 +78,7 @@ export function LoginPage({ onNavigate }: LoginPageProps) {
       <button
         type="button"
         onClick={() => onNavigate("/")}
+        data-ocid="login.secondary_button"
         className="mt-6 text-muted-foreground text-sm hover:text-foreground transition-colors"
       >
         Continue as guest
