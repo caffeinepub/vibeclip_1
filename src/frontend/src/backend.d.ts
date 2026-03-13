@@ -49,6 +49,7 @@ export enum UserRole {
 export interface backendInterface {
     addComment(videoId: bigint, content: string): Promise<bigint>;
     assignCallerUserRole(user: Principal, role: UserRole): Promise<void>;
+    claimAdminWithToken(token: string): Promise<boolean>;
     createOrUpdateProfile(username: string, displayName: string, bio: string, avatarBlobId: ExternalBlob): Promise<void>;
     deleteComment(commentId: bigint): Promise<void>;
     deleteVideo(videoId: bigint): Promise<void>;

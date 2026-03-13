@@ -71,6 +71,7 @@ export interface _SERVICE {
   '_initializeAccessControlWithSecret' : ActorMethod<[string], undefined>,
   'addComment' : ActorMethod<[bigint, string], bigint>,
   'assignCallerUserRole' : ActorMethod<[Principal, UserRole], undefined>,
+  'claimAdminWithToken' : ActorMethod<[string], boolean>,
   'createOrUpdateProfile' : ActorMethod<
     [string, string, string, ExternalBlob],
     undefined

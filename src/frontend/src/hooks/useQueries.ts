@@ -281,7 +281,11 @@ export function useClaimAdmin() {
   return useMutation({
     mutationFn: async (token: string) => {
       if (!actor) throw new Error("Not authenticated");
-      return (actor as any)._initializeAccessControlWithSecret(token);
+      const granted = await actor.claimAdminWithToken(token);
+      if (!granted) {
+        throw new Error("Invalid admin token");
+      }
+      return granted;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["admin"] });

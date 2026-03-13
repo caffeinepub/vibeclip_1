@@ -9,6 +9,7 @@ import Order "mo:core/Order";
 import List "mo:core/List";
 import Runtime "mo:core/Runtime";
 import Principal "mo:core/Principal";
+import Prim "mo:prim";
 
 import Storage "blob-storage/Storage";
 import MixinAuthorization "authorization/MixinAuthorization";
@@ -106,6 +107,20 @@ actor {
   // Auto-register the caller as a user (safe to call multiple times)
   public shared ({ caller }) func registerUser() : async () {
     AccessControl.registerUser(accessControlState, caller);
+  };
+
+  // Claim admin role with the correct admin token -- works even if already registered
+  public shared ({ caller }) func claimAdminWithToken(token : Text) : async Bool {
+    switch (Prim.envVar<system>("CAFFEINE_ADMIN_TOKEN")) {
+      case (null) {
+        Runtime.trap("CAFFEINE_ADMIN_TOKEN environment variable is not set");
+      };
+      case (?adminToken) {
+        // Register user first if not already
+        AccessControl.registerUser(accessControlState, caller);
+        AccessControl.claimAdmin(accessControlState, caller, adminToken, token);
+      };
+    };
   };
 
   // Required profile functions for frontend
