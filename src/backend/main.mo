@@ -50,8 +50,8 @@ actor {
   };
 
   // ID counters
-  stable var nextVideoId = 1;
-  stable var nextCommentId = 1;
+  var nextVideoId = 1;
+  var nextCommentId = 1;
 
   // Storage
   let videos = Map.empty<Nat, Video>();
@@ -63,24 +63,30 @@ actor {
   let hashtagVideos = Map.empty<Text, Set.Set<Nat>>();
 
   // Stable storage for persistence across upgrades
+  stable var stableNextVideoId : Nat = 1;
+  stable var stableNextCommentId : Nat = 1;
   stable var stableVideos : [(Nat, Video)] = [];
   stable var stableProfiles : [(Principal, UserProfile)] = [];
   stable var stableComments : [(Nat, Comment)] = [];
 
   system func preupgrade() {
+    stableNextVideoId := nextVideoId;
+    stableNextCommentId := nextCommentId;
     stableVideos := videos.entries().toArray();
     stableProfiles := userProfiles.entries().toArray();
     stableComments := comments.entries().toArray();
   };
 
   system func postupgrade() {
-    for ((k, v) in stableVideos.values()) {
+    nextVideoId := stableNextVideoId;
+    nextCommentId := stableNextCommentId;
+    for ((k, v) in stableVideos.vals()) {
       videos.add(k, v);
     };
-    for ((k, v) in stableProfiles.values()) {
+    for ((k, v) in stableProfiles.vals()) {
       userProfiles.add(k, v);
     };
-    for ((k, v) in stableComments.values()) {
+    for ((k, v) in stableComments.vals()) {
       comments.add(k, v);
     };
     stableVideos := [];
@@ -88,16 +94,20 @@ actor {
     stableComments := [];
   };
 
-  // Modules
-  module Video {
-    public func compare(video1 : Video, video2 : Video) : Order.Order {
-      Nat.compare(video1.id, video2.id);
-    };
+  func compareVideos(v1 : Video, v2 : Video) : Order.Order {
+    Nat.compare(v1.id, v2.id);
   };
 
-  module Comment {
-    public func compare(comment1 : Comment, comment2 : Comment) : Order.Order {
-      Nat.compare(comment1.id, comment2.id);
+  func compareComments(c1 : Comment, c2 : Comment) : Order.Order {
+    Nat.compare(c1.id, c2.id);
+  };
+
+  // Helper: auto-register a non-anonymous caller as a user if not already registered
+  func autoRegister(state : AccessControl.AccessControlState, caller : Principal) {
+    if (caller.isAnonymous()) { return };
+    switch (state.userRoles.get(caller)) {
+      case (?_) {}; // already registered
+      case (null) { state.userRoles.add(caller, #user) };
     };
   };
 
@@ -106,19 +116,22 @@ actor {
 
   // Auto-register the caller as a user (safe to call multiple times)
   public shared ({ caller }) func registerUser() : async () {
-    AccessControl.registerUser(accessControlState, caller);
+    autoRegister(accessControlState, caller);
   };
 
-  // Claim admin role with the correct admin token -- works even if already registered
+  // Claim admin role with the correct admin token
   public shared ({ caller }) func claimAdminWithToken(token : Text) : async Bool {
+    if (caller.isAnonymous()) { return false };
     switch (Prim.envVar<system>("CAFFEINE_ADMIN_TOKEN")) {
       case (null) {
         Runtime.trap("CAFFEINE_ADMIN_TOKEN environment variable is not set");
       };
       case (?adminToken) {
-        // Register user first if not already
-        AccessControl.registerUser(accessControlState, caller);
-        AccessControl.claimAdmin(accessControlState, caller, adminToken, token);
+        if (token != adminToken) { return false };
+        // Promote caller to admin regardless of current role
+        accessControlState.userRoles.add(caller, #admin);
+        accessControlState.adminAssigned := true;
+        return true;
       };
     };
   };
@@ -129,14 +142,12 @@ actor {
   };
 
   public shared ({ caller }) func saveCallerUserProfile(profile : UserProfile) : async () {
-    // Auto-register then save
-    AccessControl.registerUser(accessControlState, caller);
+    autoRegister(accessControlState, caller);
     userProfiles.add(caller, profile);
   };
 
   public shared ({ caller }) func uploadVideo(title : Text, description : Text, hashtags : [Text], blobId : Storage.ExternalBlob, thumbnailBlobId : Storage.ExternalBlob) : async Nat {
-    // Auto-register then check permission
-    AccessControl.registerUser(accessControlState, caller);
+    autoRegister(accessControlState, caller);
     if (not (AccessControl.hasPermission(accessControlState, caller, #user))) {
       Runtime.trap("Unauthorized: Only users can upload videos");
     };
@@ -159,33 +170,22 @@ actor {
 
     videos.add(videoId, video);
 
-    for (hashtag in hashtags.values()) {
-      let existing = switch (hashtagVideos.get(hashtag)) {
-        case (null) {
-          let newSet = Set.singleton<Nat>(videoId);
-          hashtagVideos.add(hashtag, newSet);
-          newSet;
-        };
-        case (?set) {
-          set.add(videoId);
-          set;
-        };
+    for (hashtag in hashtags.vals()) {
+      switch (hashtagVideos.get(hashtag)) {
+        case (null) { hashtagVideos.add(hashtag, Set.singleton<Nat>(videoId)) };
+        case (?set) { set.add(videoId) };
       };
     };
     videoId;
   };
 
   public query ({ caller }) func getVideosPaginated(start : Nat, pageSize : Nat) : async [Video] {
-    let videoArray = videos.values().toArray().sort();
-    let videoList = List.empty<Video>();
-    var count = 0;
-    var i = if (videoArray.size() > start) { start } else { videoArray.size() };
-    while (i < videoArray.size() and count < pageSize) {
-      videoList.add(videoArray[i]);
-      i += 1;
-      count += 1;
-    };
-    videoList.toArray();
+    let rawVideos = videos.values().toArray();
+    let sorted = rawVideos.sort(compareVideos);
+    let total = sorted.size();
+    let from = if (start < total) { start } else { total };
+    let to_ = if (from + pageSize < total) { from + pageSize } else { total };
+    sorted.sliceToArray(from, to_);
   };
 
   public query ({ caller }) func getVideoById(id : Nat) : async Video {
@@ -196,43 +196,29 @@ actor {
   };
 
   public shared ({ caller }) func likeVideo(videoId : Nat) : async () {
-    AccessControl.registerUser(accessControlState, caller);
+    autoRegister(accessControlState, caller);
     switch (videos.get(videoId)) {
       case (null) { Runtime.trap("Video not found") };
       case (?_) {
-        let likes = switch (videoLikes.get(videoId)) {
-          case (null) {
-            let newSet = Set.singleton(caller);
-            videoLikes.add(videoId, newSet);
-            newSet;
-          };
-          case (?set) {
-            set.add(caller);
-            set;
-          };
+        switch (videoLikes.get(videoId)) {
+          case (null) { videoLikes.add(videoId, Set.singleton(caller)) };
+          case (?set) { set.add(caller) };
         };
-        updateLikeCount(videoId, likes);
+        updateLikeCount(videoId);
       };
     };
   };
 
   public shared ({ caller }) func unlikeVideo(videoId : Nat) : async () {
-    AccessControl.registerUser(accessControlState, caller);
+    autoRegister(accessControlState, caller);
     switch (videos.get(videoId)) {
       case (null) { Runtime.trap("Video not found") };
       case (?_) {
-        let likes = switch (videoLikes.get(videoId)) {
-          case (null) {
-            let newSet = Set.empty<Principal>();
-            videoLikes.add(videoId, newSet);
-            newSet;
-          };
-          case (?set) {
-            set.remove(caller);
-            set;
-          };
+        switch (videoLikes.get(videoId)) {
+          case (null) {};
+          case (?set) { set.remove(caller) };
         };
-        updateLikeCount(videoId, likes);
+        updateLikeCount(videoId);
       };
     };
   };
@@ -241,21 +227,16 @@ actor {
     switch (videos.get(videoId)) {
       case (null) { Runtime.trap("Video not found") };
       case (?video) {
-        let updatedVideo = {
-          video with
-          viewCount = video.viewCount + 1;
-        };
-        videos.add(videoId, updatedVideo);
+        videos.add(videoId, { video with viewCount = video.viewCount + 1 });
       };
     };
   };
 
   public shared ({ caller }) func deleteVideo(videoId : Nat) : async () {
-    AccessControl.registerUser(accessControlState, caller);
+    autoRegister(accessControlState, caller);
     switch (videos.get(videoId)) {
       case (null) { Runtime.trap("Video not found") };
       case (?video) {
-        // Allow admin OR uploader to delete
         if (video.uploader != caller and not AccessControl.isAdmin(accessControlState, caller)) {
           Runtime.trap("Unauthorized: Only uploader or admin can delete video");
         };
@@ -265,7 +246,7 @@ actor {
   };
 
   public shared ({ caller }) func addComment(videoId : Nat, content : Text) : async Nat {
-    AccessControl.registerUser(accessControlState, caller);
+    autoRegister(accessControlState, caller);
     switch (videos.get(videoId)) {
       case (null) { Runtime.trap("Video not found") };
       case (?_) {
@@ -285,17 +266,16 @@ actor {
   };
 
   public query ({ caller }) func getCommentsForVideo(videoId : Nat) : async [Comment] {
-    let commentList = List.empty<Comment>();
+    let filtered = List.empty<Comment>();
     for ((_, comment) in comments.entries()) {
-      if (comment.videoId == videoId) {
-        commentList.add(comment);
-      };
+      if (comment.videoId == videoId) { filtered.add(comment) };
     };
-    commentList.toArray().sort();
+    let arr = filtered.toArray();
+    arr.sort(compareComments);
   };
 
   public shared ({ caller }) func deleteComment(commentId : Nat) : async () {
-    AccessControl.registerUser(accessControlState, caller);
+    autoRegister(accessControlState, caller);
     switch (comments.get(commentId)) {
       case (null) { Runtime.trap("Comment not found") };
       case (?comment) {
@@ -308,15 +288,14 @@ actor {
   };
 
   public shared ({ caller }) func createOrUpdateProfile(username : Text, displayName : Text, bio : Text, avatarBlobId : Storage.ExternalBlob) : async () {
-    AccessControl.registerUser(accessControlState, caller);
-    let profile : UserProfile = {
+    autoRegister(accessControlState, caller);
+    userProfiles.add(caller, {
       principal = caller;
       username;
       displayName;
       bio;
       avatarBlobId;
-    };
-    userProfiles.add(caller, profile);
+    });
   };
 
   public query ({ caller }) func getUserProfile(user : Principal) : async ?UserProfile {
@@ -324,56 +303,26 @@ actor {
   };
 
   public shared ({ caller }) func followUser(userToFollow : Principal) : async () {
-    AccessControl.registerUser(accessControlState, caller);
-    let followersSet = switch (followers.get(userToFollow)) {
-      case (null) {
-        let newSet = Set.singleton(caller);
-        followers.add(userToFollow, newSet);
-        newSet;
-      };
-      case (?set) {
-        set.add(caller);
-        set;
-      };
+    autoRegister(accessControlState, caller);
+    switch (followers.get(userToFollow)) {
+      case (null) { followers.add(userToFollow, Set.singleton(caller)) };
+      case (?set) { set.add(caller) };
     };
-
-    let followingSet = switch (following.get(caller)) {
-      case (null) {
-        let newSet = Set.singleton(userToFollow);
-        following.add(caller, newSet);
-        newSet;
-      };
-      case (?set) {
-        set.add(userToFollow);
-        set;
-      };
+    switch (following.get(caller)) {
+      case (null) { following.add(caller, Set.singleton(userToFollow)) };
+      case (?set) { set.add(userToFollow) };
     };
   };
 
   public shared ({ caller }) func unfollowUser(userToUnfollow : Principal) : async () {
-    AccessControl.registerUser(accessControlState, caller);
-    let followersSet = switch (followers.get(userToUnfollow)) {
-      case (null) {
-        let newSet = Set.empty<Principal>();
-        followers.add(userToUnfollow, newSet);
-        newSet;
-      };
-      case (?set) {
-        set.remove(caller);
-        set;
-      };
+    autoRegister(accessControlState, caller);
+    switch (followers.get(userToUnfollow)) {
+      case (null) {};
+      case (?set) { set.remove(caller) };
     };
-
-    let followingSet = switch (following.get(caller)) {
-      case (null) {
-        let newSet = Set.empty<Principal>();
-        following.add(caller, newSet);
-        newSet;
-      };
-      case (?set) {
-        set.remove(userToUnfollow);
-        set;
-      };
+    switch (following.get(caller)) {
+      case (null) {};
+      case (?set) { set.remove(userToUnfollow) };
     };
   };
 
@@ -401,51 +350,42 @@ actor {
   public query ({ caller }) func getTrendingHashtags() : async [(Text, Nat)] {
     let counts = Map.empty<Text, Nat>();
     for ((_, video) in videos.entries()) {
-      for (hashtag in video.hashtags.values()) {
-        let currentCount = switch (counts.get(hashtag)) {
+      for (hashtag in video.hashtags.vals()) {
+        let current = switch (counts.get(hashtag)) {
           case (null) { 0 };
-          case (?count) { count };
+          case (?n) { n };
         };
-        counts.add(hashtag, currentCount + 1);
+        counts.add(hashtag, current + 1);
       };
     };
-
-    let entries = counts.entries().toArray();
-    if (entries.size() == 0) {
-      return [];
-    };
-
-    entries;
+    counts.entries().toArray();
   };
 
   public query ({ caller }) func getVideosByHashtag(hashtag : Text) : async [Video] {
-    let videoList = List.empty<Video>();
     switch (hashtagVideos.get(hashtag)) {
-      case (null) { return [] };
+      case (null) { [] };
       case (?set) {
+        let result = List.empty<Video>();
         for (id in set.values()) {
-          if (videos.containsKey(id)) {
-            let video = switch (videos.get(id)) {
-              case (null) { Runtime.trap("Video not found") };
-              case (?video) { video };
-            };
-            videoList.add(video);
+          switch (videos.get(id)) {
+            case (null) {};
+            case (?video) { result.add(video) };
           };
         };
+        result.toArray();
       };
     };
-    videoList.toArray();
   };
 
-  func updateLikeCount(videoId : Nat, likes : Set.Set<Principal>) {
+  func updateLikeCount(videoId : Nat) {
+    let count = switch (videoLikes.get(videoId)) {
+      case (null) { 0 };
+      case (?set) { set.size() };
+    };
     switch (videos.get(videoId)) {
-      case (null) { Runtime.trap("Video not found") };
+      case (null) {};
       case (?video) {
-        let updatedVideo = {
-          video with
-          likeCount = likes.size();
-        };
-        videos.add(videoId, updatedVideo);
+        videos.add(videoId, { video with likeCount = count });
       };
     };
   };

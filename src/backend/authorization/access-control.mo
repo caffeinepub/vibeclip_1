@@ -21,17 +21,6 @@ module {
     };
   };
 
-  // Register a caller as a user if not already registered
-  public func registerUser(state : AccessControlState, caller : Principal) {
-    if (caller.isAnonymous()) { return };
-    switch (state.userRoles.get(caller)) {
-      case (?_) {}; // Already registered, do nothing
-      case (null) {
-        state.userRoles.add(caller, #user);
-      };
-    };
-  };
-
   // First principal that calls this function becomes admin, all other principals become users.
   public func initialize(state : AccessControlState, caller : Principal, adminToken : Text, userProvidedToken : Text) {
     if (caller.isAnonymous()) { return };
@@ -46,17 +35,6 @@ module {
         };
       };
     };
-  };
-
-  // Promote caller to admin if token matches, regardless of current role
-  public func claimAdmin(state : AccessControlState, caller : Principal, adminToken : Text, userProvidedToken : Text) : Bool {
-    if (caller.isAnonymous()) { return false };
-    if (userProvidedToken == adminToken) {
-      state.userRoles.add(caller, #admin);
-      state.adminAssigned := true;
-      return true;
-    };
-    return false;
   };
 
   public func getUserRole(state : AccessControlState, caller : Principal) : UserRole {

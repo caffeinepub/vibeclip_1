@@ -3,7 +3,7 @@ import { VideoCard } from "@/components/VideoCard";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useAuth } from "@/hooks/useAuth";
 import { useVideosFeed } from "@/hooks/useQueries";
-import { LogIn } from "lucide-react";
+import { LogIn, RefreshCw } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 
 interface FeedPageProps {
@@ -15,7 +15,7 @@ export function FeedPage({ onNavigate }: FeedPageProps) {
   const [activeVideoIndex, setActiveVideoIndex] = useState(0);
   const [commentVideoId, setCommentVideoId] = useState<bigint | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
-  const { data: videos, isLoading } = useVideosFeed(0);
+  const { data: videos, isLoading, isError, refetch } = useVideosFeed(0);
   const { isAuthenticated, login } = useAuth();
 
   useEffect(() => {
@@ -91,6 +91,25 @@ export function FeedPage({ onNavigate }: FeedPageProps) {
       {isLoading ? (
         <div className="w-full h-full bg-black">
           <Skeleton className="w-full h-full" data-ocid="feed.loading_state" />
+        </div>
+      ) : isError ? (
+        <div
+          data-ocid="feed.error_state"
+          className="w-full h-full flex flex-col items-center justify-center gap-4 bg-background px-8 text-center"
+        >
+          <div className="text-5xl">😬</div>
+          <h2 className="font-display font-bold text-xl">Couldn't load feed</h2>
+          <p className="text-muted-foreground text-sm">
+            Something went wrong loading the videos.
+          </p>
+          <button
+            type="button"
+            onClick={() => refetch()}
+            className="mt-2 flex items-center gap-2 bg-primary text-primary-foreground px-6 py-3 rounded-xl font-semibold text-sm hover:opacity-90 transition-opacity neon-glow"
+          >
+            <RefreshCw size={16} />
+            Try Again
+          </button>
         </div>
       ) : !videos || videos.length === 0 ? (
         <div
