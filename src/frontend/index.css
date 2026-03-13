@@ -1,0 +1,94 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@import url('https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,200..800&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Satoshi:wght@300;400;500;700&display=swap');
+
+@layer base {
+  :root {
+    --radius: 0.75rem;
+
+    /* Vibeclip dark theme - neon green accent */
+    --background: 0.09 0 0;
+    --foreground: 0.97 0 0;
+    --card: 0.12 0 0;
+    --card-foreground: 0.97 0 0;
+    --popover: 0.15 0 0;
+    --popover-foreground: 0.97 0 0;
+    --primary: 0.87 0.29 142;
+    --primary-foreground: 0.08 0 0;
+    --secondary: 0.18 0 0;
+    --secondary-foreground: 0.97 0 0;
+    --destructive: 0.65 0.25 27;
+    --destructive-foreground: 0.97 0 0;
+    --muted: 0.2 0 0;
+    --muted-foreground: 0.55 0 0;
+    --accent: 0.87 0.29 142;
+    --accent-foreground: 0.08 0 0;
+    --border: 0.22 0 0;
+    --input: 0.18 0 0;
+    --ring: 0.87 0.29 142;
+    --chart-1: 0.87 0.29 142;
+    --chart-2: 0.7 0.2 142;
+    --chart-3: 0.5 0.15 142;
+    --chart-4: 0.6 0.2 200;
+    --chart-5: 0.65 0.25 27;
+    --sidebar: 0.12 0 0;
+    --sidebar-foreground: 0.97 0 0;
+    --sidebar-primary: 0.87 0.29 142;
+    --sidebar-primary-foreground: 0.08 0 0;
+    --sidebar-accent: 0.87 0.29 142;
+    --sidebar-accent-foreground: 0.08 0 0;
+    --sidebar-border: 0.22 0 0;
+    --sidebar-ring: 0.87 0.29 142;
+  }
+
+  * {
+    @apply border-border;
+  }
+
+  body {
+    @apply bg-background text-foreground font-body;
+    font-feature-settings: 'cv02', 'cv03', 'cv04', 'cv11';
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
+  h1, h2, h3, h4, h5, h6 {
+    font-family: 'Bricolage Grotesque', sans-serif;
+  }
+}
+
+@layer utilities {
+  .scrollbar-hide {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+  .scrollbar-hide::-webkit-scrollbar {
+    display: none;
+  }
+
+  .neon-glow {
+    box-shadow: 0 0 20px oklch(0.87 0.29 142 / 0.4), 0 0 40px oklch(0.87 0.29 142 / 0.2);
+  }
+
+  .neon-text-glow {
+    text-shadow: 0 0 10px oklch(0.87 0.29 142 / 0.8), 0 0 20px oklch(0.87 0.29 142 / 0.4);
+  }
+
+  .gradient-overlay {
+    background: linear-gradient(
+      to top,
+      oklch(0.09 0 0 / 0.9) 0%,
+      oklch(0.09 0 0 / 0.4) 50%,
+      transparent 100%
+    );
+  }
+
+  .glass {
+    background: oklch(0.15 0 0 / 0.6);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+  }
+}
